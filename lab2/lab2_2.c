@@ -1,13 +1,34 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-float *readfile(char *filename ){
-    FILE *fp = fopen(filename ,"r");
+#include <string.h>
+double **readfile(char *filename)
+{
+    FILE *fp = fopen(filename, "r");
     if (fp == NULL)
     {
         printf("Error: could not open file %s", filename);
     }
-    
+    const unsigned MAX_LENGTH = 256;
+    char buffer[MAX_LENGTH];
+    char *pch;
+    int i = 0, j = 0;
+    double **data;
+    data = malloc(sizeof(double*)*21);
+    while (fgets(buffer, MAX_LENGTH, fp)){
+        pch = strtok(buffer, " ");
+        data[i] = malloc(sizeof(double*)*20);
+        while (pch != NULL)
+        {
+            data[i][j++] = atof(pch);
+            pch = strtok(NULL," ");
+        }
+        i += 1;
+        j = 0;
+    }
+    // close the file
+    fclose(fp);
+    return data;
 }
 int main(int argc, char **argv)
 {
@@ -36,13 +57,16 @@ int main(int argc, char **argv)
     // Print off a hello world message
     printf("Hello world %s, rank %d out of %d processors\n",
            processor_name, world_rank, world_size);
-    if(world_rank == 0){
+    char *str1;
+    if (world_rank == 0)
+    {
         printf("process read A\n");
-        readfile("matAsmall.txt");
+        double **temp1 = readfile("matAsmall.txt");
     }
-    else if(world_rank == 1){
+    else if (world_rank == 1)
+    {
         printf("process read B");
-        readfile("matBsmall.txt");
+        double **temp2 = readfile("matBsmall.txt");
     }
     // int buffer = (world_rank== 0)?12345:67890;
     // int tag_send = 0;
@@ -51,6 +75,6 @@ int main(int argc, char **argv)
     // printf("MPI process rank %d sends value %d to MPI process %d.\n", world_rank, buffer, peer);
     // MPI_Sendrecv_replace(&buffer,1,MPI_INT,peer,tag_send,peer,tag_recv,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     // printf("MPI process rank %d received value %d from MPI process %d.\n", world_rank, buffer, peer);
-    // // Finalize the MPI environment. No more MPI calls can be made after this
+    // Finalize the MPI environment. No more MPI calls can be made after this
     MPI_Finalize();
 }
