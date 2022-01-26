@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-double **readfile(char *filename)
+
+double *readfile(char *filename, int *SizeCol, int *SizeRow)
 {
     FILE *fp = fopen(filename, "r");
     if (fp == NULL)
@@ -12,19 +13,28 @@ double **readfile(char *filename)
     const unsigned MAX_LENGTH = 256;
     char buffer[MAX_LENGTH];
     char *pch;
-    int i = 0, j = 0;
-    double **data;
-    data = malloc(sizeof(double*)*21);
-    while (fgets(buffer, MAX_LENGTH, fp)){
+    int i = 0;
+    int temp1 , temp2;
+    double *data;
+    // split size
+    fgets(buffer, MAX_LENGTH, fp);
+    pch = strtok(buffer, " ");
+    temp1 = atoi(pch);
+    *SizeRow = temp1;
+    pch = strtok(NULL, " ");
+    temp2 = atoi(pch);
+    *SizeCol = temp2;
+    pch = strtok(NULL, " ");
+    // split size
+    data = malloc(sizeof(double *) * ((*SizeRow) * (*SizeCol)));
+    while (fgets(buffer, MAX_LENGTH, fp))
+    {
         pch = strtok(buffer, " ");
-        data[i] = malloc(sizeof(double*)*20);
         while (pch != NULL)
         {
-            data[i][j++] = atof(pch);
-            pch = strtok(NULL," ");
+            data[i++]= atof(pch);
+            pch = strtok(NULL, " ");
         }
-        i += 1;
-        j = 0;
     }
     // close the file
     fclose(fp);
@@ -61,12 +71,10 @@ int main(int argc, char **argv)
     if (world_rank == 0)
     {
         printf("process read A\n");
-        double **temp1 = readfile("matAsmall.txt");
-    }
-    else if (world_rank == 1)
-    {
-        printf("process read B");
-        double **temp2 = readfile("matBsmall.txt");
+        int SizeR,SizeC;
+        double *temp1 = readfile("matAsmall.txt",&SizeR,&SizeC);
+        printf(" %lf , %d , %d",temp1[0],SizeR,SizeC);
+        // double **temp2 = readfile("matBsmall.txt");
     }
     // int buffer = (world_rank== 0)?12345:67890;
     // int tag_send = 0;
