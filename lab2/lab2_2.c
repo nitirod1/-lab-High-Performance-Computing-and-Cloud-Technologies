@@ -43,9 +43,10 @@ double *readfile(char *filename, int *SizeCol, int *SizeRow)
 //ใช้ malloc แล้วมีปัญหา
 int main(int argc, char **argv)
 {
-    int elements_per_process, index;
+    int elements_per_process, index,pos=0;
     double *temp2;
     double *temp1;
+    double *result;
    
     MPI_Status status;
     // Initialize the MPI environment. The two arguments to MPI Init are not
@@ -73,7 +74,7 @@ int main(int argc, char **argv)
     // Print off a hello world message
     printf("Hello world %s, rank %d out of %d processors\n",
            processor_name, world_rank, world_size);
-    int i;
+    int i,j;
     if (world_rank == 0)
     {
         int SizeR, SizeC, SizeR_, SizeC_;
@@ -82,22 +83,48 @@ int main(int argc, char **argv)
         temp1 = readfile("matAsmall.txt", &SizeR, &SizeC);
         temp2 = readfile("matBsmall.txt", &SizeR_, &SizeC_);
         elements_per_process = (SizeR * SizeC) / world_size;
+        result = malloc((SizeR * SizeC) * sizeof(double));
+        for(i =0 ;i<elements_per_process;i++){
+            result[pos++] = temp1[i]+temp2[i];
+        }
         for (i = 1; i < world_size; i++)
         {
             index = i * elements_per_process;
             printf("show index : %d\n",index);
             // send size element_per_process
             MPI_Send(&elements_per_process, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-            MPI_Send(&temp1[index], elements_per_process, MPI_DOUBLE, i, 1, MPI_COMM_WORLD);     // MPI_Send(&temp2, elements_per_process, MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
+            MPI_Send(&temp1[index], elements_per_process, MPI_DOUBLE, i, 1, MPI_COMM_WORLD);
+            MPI_Send(&temp2[index], elements_per_process, MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
+            double *calculated = malloc(elements_per_process * sizeof(double));   // MPI_Send(&temp2, elements_per_process, MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
+            MPI_Recv(calculated,elements_per_process, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &status);
+            for(j=0;j<elements_per_process;j++){
+                result[pos++]=calculated[j];
+            }
+            free(calculated);
+        }
+        
+        printf("\n%d\n",pos);
+        for(i=0;i<pos;i++){
+            if( i%20 == 0){
+                printf("\n");
+            }
+            printf(" %lf",result[i]);
         }
     }
     else
     {
         MPI_Recv(&elements_per_process, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-        double *element = malloc(elements_per_process * sizeof(double));
-        MPI_Recv(element, elements_per_process, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, &status);
-        printf("%lf",element[199]);
-        // MPI_Recv(&temp2,elements_per_process,MPI_DOUBLE,0,2,MPI_COMM_WORLD,&status);
+        double *element_1 = malloc(elements_per_process * sizeof(double));
+        MPI_Recv(element_1, elements_per_process, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, &status);
+        double *element_2 =  malloc(elements_per_process * sizeof(double));
+        MPI_Recv(element_2, elements_per_process, MPI_DOUBLE, 0, 2, MPI_COMM_WORLD, &status);
+        double *calculated =  malloc(elements_per_process * sizeof(double));
+        for(i =0 ;i<elements_per_process;i++){
+            calculated[i] = element_1[i]+element_2[i];
+        }
+        free(element_1);
+        free(element_2);
+        MPI_Send(&calculated[0],elements_per_process,MPI_DOUBLE, 0,3, MPI_COMM_WORLD);   
     }
     // element = malloc(sizeof(double *) * (elements_per_process));
     // printf("rank %d data %lf element %d processors\n",world_rank,temp1[0], elements_per_process);
