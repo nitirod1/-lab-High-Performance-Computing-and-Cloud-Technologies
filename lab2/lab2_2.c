@@ -3,14 +3,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-double *readfile(char *filename, int *SizeCol, int *SizeRow)
+typedef struct Matrix{
+    double *data;
+    int sizeR,sizeC;
+}Matrixs;
+double *readfile(char *filename, int *SizeRow,int *SizeCol)
 {
     FILE *fp = fopen(filename, "r");
     if (fp == NULL)
     {
         printf("Error: could not open file %s", filename);
     }
-    const unsigned MAX_LENGTH = 256;
+    const unsigned MAX_LENGTH = 1048576;
     char buffer[MAX_LENGTH];
     char *pch;
     int i = 0;
@@ -40,6 +44,21 @@ double *readfile(char *filename, int *SizeCol, int *SizeRow)
     fclose(fp);
     return data;
 }
+void writefile(char *filename ,double *result ,int SizeR,int SizeC){
+    FILE *fp = fopen(filename,"w");
+    int i ;
+    if(fp  == NULL){
+        printf("file can't open\n");
+    }
+    fprintf(fp,"%d %d",SizeR,SizeC);
+    for (i=0;i<SizeR*SizeC;i++){
+        if(i%SizeC == 0){
+            fprintf(fp,"\n");
+        }
+        fprintf(fp,"%lf ",result[i]);
+    }
+}
+
 //ใช้ malloc แล้วมีปัญหา
 int main(int argc, char **argv)
 {
@@ -90,7 +109,6 @@ int main(int argc, char **argv)
         for (i = 1; i < world_size; i++)
         {
             index = i * elements_per_process;
-            printf("show index : %d\n",index);
             // send size element_per_process
             MPI_Send(&elements_per_process, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
             MPI_Send(&temp1[index], elements_per_process, MPI_DOUBLE, i, 1, MPI_COMM_WORLD);
@@ -102,14 +120,14 @@ int main(int argc, char **argv)
             }
             free(calculated);
         }
-        
-        printf("\n%d\n",pos);
-        for(i=0;i<pos;i++){
-            if( i%20 == 0){
-                printf("\n");
-            }
-            printf(" %lf",result[i]);
-        }
+        writefile("result.txt",result,SizeR,SizeC);
+        // printf("\n%d\n",pos);
+        // for(i=0;i<pos;i++){
+        //     if( i%20 == 0){
+        //         printf("\n");
+        //     }
+        //     printf(" %lf",result[i]);
+        // }
     }
     else
     {
