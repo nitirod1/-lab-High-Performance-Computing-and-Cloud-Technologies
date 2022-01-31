@@ -67,14 +67,9 @@ int main(int argc, char **argv)
     double *temp2;
     double *temp1;
     double *result;
-
     MPI_Status status;
-    // Initialize the MPI environment. The two arguments to MPI Init are not
-    // currently used by MPI implementations, but are there in case future
-    // implementations might need the arguments.
     MPI_Init(&argc, &argv);
 
-    // Get the number of processes
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     if (world_size > 4)
@@ -82,16 +77,12 @@ int main(int argc, char **argv)
         printf("error ");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
-    // Get the rank of the process
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-
-    // Get the name of the processor
     char processor_name[MPI_MAX_PROCESSOR_NAME];
     int name_len;
     MPI_Get_processor_name(processor_name, &name_len);
 
-    // Print off a hello world message
     printf("Hello world %s, rank %d out of %d processors\n",
            processor_name, world_rank, world_size);
     int i, j;
@@ -100,8 +91,8 @@ int main(int argc, char **argv)
         int SizeR, SizeC, SizeR_, SizeC_;
         double test = 0;
         int index;
-        temp1 = readfile("matAsmall.txt", &SizeR, &SizeC);
-        temp2 = readfile("matBsmall.txt", &SizeR_, &SizeC_);
+        temp1 = readfile("matAlarge.txt", &SizeR, &SizeC);
+        temp2 = readfile("matBlarge.txt", &SizeR_, &SizeC_);
         elements_per_process = (SizeR * SizeC) / world_size;
         result = malloc((SizeR * SizeC) * sizeof(double));
         for (i = 0; i < elements_per_process; i++)
@@ -124,13 +115,6 @@ int main(int argc, char **argv)
             free(calculated);
         }
         writefile("result.txt", result, SizeR, SizeC);
-        // printf("\n%d\n",pos);
-        // for(i=0;i<pos;i++){
-        //     if( i%20 == 0){
-        //         printf("\n");
-        //     }
-        //     printf(" %lf",result[i]);
-        // }
     }
     else
     {
@@ -148,17 +132,6 @@ int main(int argc, char **argv)
         free(element_2);
         MPI_Send(&calculated[0], elements_per_process, MPI_DOUBLE, 0, 3, MPI_COMM_WORLD);
     }
-    // element = malloc(sizeof(double *) * (elements_per_process));
-    // printf("rank %d data %lf element %d processors\n",world_rank,temp1[0], elements_per_process);
-    // printf("rank %d data %lf element %d processors\n",world_rank,temp2[0], elements_per_process);
-    // int buffer = (world_rank== 0)?12345:67890;
-    // int tag_send = 0;
-    // int tag_recv = tag_send;
-    // int peer = (world_rank == 0)?1:0;
-    // printf("MPI process rank %d sends value %d to MPI process %d.\n", world_rank, buffer, peer);
-    // MPI_Sendrecv_replace(&buffer,1,MPI_INT,peer,tag_send,peer,tag_recv,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-    // printf("MPI process rank %d received value %d from MPI process %d.\n", world_rank, buffer, peer);
-    // Finalize the MPI environment. No more MPI calls can be made after this
     free(temp1);
     free(temp2);
     MPI_Finalize();
