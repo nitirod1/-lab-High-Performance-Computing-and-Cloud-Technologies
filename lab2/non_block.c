@@ -19,6 +19,10 @@ void Readfile(char *filename, Matrixs *mat)
     int i = 0;
     int temp1, temp2;
     FILE *fp = fopen(filename, "r");
+    if (fp == NULL)
+    {
+        printf("Error can't open file\n");
+    }
     fscanf(fp, "%d %d", &mat->sizeR, &mat->sizeC);
     arrays_reservation_Matrixs(mat, (mat->sizeC) * (mat->sizeR));
     for (i = 0; i < (mat->sizeC) * (mat->sizeR); i++)
@@ -33,7 +37,7 @@ void writefile(char *filename, Matrixs *mat)
     int i;
     if (fp == NULL)
     {
-        printf("file can't open\n");
+        printf("file can't open %s\n", filename);
     }
     fprintf(fp, "%d %d", mat->sizeR, mat->sizeC);
     for (i = 0; i < mat->sizeR * mat->sizeC; i++)
@@ -145,8 +149,8 @@ void master_process(int size)
     Matrixs matA, matB, result;
     double *cal = 0;
     int element_per_process;
-    Readfile("matAlarge.txt", &matA);
-    Readfile("matBlarge.txt", &matB);
+    Readfile("matAsmall.txt", &matA);
+    Readfile("matBsmall.txt", &matB);
     element_per_process = send_process(&matA, size);
     element_per_process = send_process(&matB, size);
     cal = cal_matrix(&matA, &matB, element_per_process);
@@ -179,11 +183,14 @@ void deliver(int rank, int size)
 int main(int argc, char **argv)
 {
     int world_size;
-
+    double StartTime, EndTime;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    StartTime = MPI_Wtime();
     deliver(world_rank, world_size);
+    EndTime = MPI_Wtime();
+    printf("process %d : %lf sec\n", world_rank, EndTime - StartTime);
     MPI_Finalize();
     return 0;
 }

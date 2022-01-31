@@ -67,6 +67,7 @@ int main(int argc, char **argv)
     double *temp2;
     double *temp1;
     double *result;
+    double StartTime, EndTime;
     MPI_Status status;
     MPI_Init(&argc, &argv);
 
@@ -82,10 +83,8 @@ int main(int argc, char **argv)
     char processor_name[MPI_MAX_PROCESSOR_NAME];
     int name_len;
     MPI_Get_processor_name(processor_name, &name_len);
-
-    printf("Hello world %s, rank %d out of %d processors\n",
-           processor_name, world_rank, world_size);
     int i, j;
+    StartTime = MPI_Wtime();
     if (world_rank == 0)
     {
         int SizeR, SizeC, SizeR_, SizeC_;
@@ -137,5 +136,7 @@ int main(int argc, char **argv)
         free(element_2);
         MPI_Send(&calculated[0], elements_per_process, MPI_DOUBLE, 0, 3, MPI_COMM_WORLD);
     }
+    EndTime = MPI_Wtime();
+    printf("process %d : %lf sec\n", world_rank, EndTime - StartTime);
     MPI_Finalize();
 }
