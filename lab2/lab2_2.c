@@ -7,17 +7,17 @@
 double *readfile(char *filename, int *SizeRow, int *SizeCol)
 {
     FILE *fp = fopen(filename, "r");
-    if (fp == NULL)
-    {
-        printf("Error: could not open file %s", filename);
-    }
     const unsigned MAX_LENGTH = 1048576;
     char buffer[MAX_LENGTH];
     char *pch;
     int i = 0;
     int temp1, temp2;
     double *data;
-    // split size
+    if (fp == NULL)
+    {
+        printf("error\n");
+        return 0;
+    }
     fgets(buffer, MAX_LENGTH, fp);
     pch = strtok(buffer, " ");
     temp1 = atoi(pch);
@@ -91,30 +91,35 @@ int main(int argc, char **argv)
         int SizeR, SizeC, SizeR_, SizeC_;
         double test = 0;
         int index;
-        temp1 = readfile("matAlarge.txt", &SizeR, &SizeC);
-        temp2 = readfile("matBlarge.txt", &SizeR_, &SizeC_);
-        elements_per_process = (SizeR * SizeC) / world_size;
-        result = malloc((SizeR * SizeC) * sizeof(double));
-        for (i = 0; i < elements_per_process; i++)
+        temp1 = readfile("matAsmall.txt", &SizeR, &SizeC);
+        temp2 = readfile("matBsmall.txt", &SizeR_, &SizeC_);
+        if (temp1 != 0 || temp2 != 0)
         {
-            result[pos++] = temp1[i] + temp2[i];
-        }
-        for (i = 1; i < world_size; i++)
-        {
-            index = i * elements_per_process;
-            // send size element_per_process
-            MPI_Send(&elements_per_process, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-            MPI_Send(&temp1[index], elements_per_process, MPI_DOUBLE, i, 1, MPI_COMM_WORLD);
-            MPI_Send(&temp2[index], elements_per_process, MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
-            double *calculated = malloc(elements_per_process * sizeof(double)); // MPI_Send(&temp2, elements_per_process, MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
-            MPI_Recv(calculated, elements_per_process, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &status);
-            for (j = 0; j < elements_per_process; j++)
+            elements_per_process = (SizeR * SizeC) / world_size;
+            result = malloc((SizeR * SizeC) * sizeof(double));
+            for (i = 0; i < elements_per_process; i++)
             {
-                result[pos++] = calculated[j];
+                result[pos++] = temp1[i] + temp2[i];
             }
-            free(calculated);
+            for (i = 1; i < world_size; i++)
+            {
+                index = i * elements_per_process;
+                // send size element_per_process
+                MPI_Send(&elements_per_process, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+                MPI_Send(&temp1[index], elements_per_process, MPI_DOUBLE, i, 1, MPI_COMM_WORLD);
+                MPI_Send(&temp2[index], elements_per_process, MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
+                double *calculated = malloc(elements_per_process * sizeof(double)); // MPI_Send(&temp2, elements_per_process, MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
+                MPI_Recv(calculated, elements_per_process, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &status);
+                for (j = 0; j < elements_per_process; j++)
+                {
+                    result[pos++] = calculated[j];
+                }
+                free(calculated);
+            }
+            writefile("result.txt", result, SizeR, SizeC);
+            free(temp1);
+            free(temp2);
         }
-        writefile("result.txt", result, SizeR, SizeC);
     }
     else
     {
@@ -132,7 +137,5 @@ int main(int argc, char **argv)
         free(element_2);
         MPI_Send(&calculated[0], elements_per_process, MPI_DOUBLE, 0, 3, MPI_COMM_WORLD);
     }
-    free(temp1);
-    free(temp2);
     MPI_Finalize();
 }
