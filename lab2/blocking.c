@@ -75,7 +75,7 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     if (world_size > 4)
     {
-        printf("error ");
+        printf("error process\n");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
     int world_rank;
@@ -84,14 +84,14 @@ int main(int argc, char **argv)
     int name_len;
     MPI_Get_processor_name(processor_name, &name_len);
     int i, j;
-    StartTime = MPI_Wtime();
     if (world_rank == 0)
     {
         int SizeR, SizeC, SizeR_, SizeC_;
         double test = 0;
         int index;
-        temp1 = readfile("matAsmall.txt", &SizeR, &SizeC);
-        temp2 = readfile("matBsmall.txt", &SizeR_, &SizeC_);
+        temp1 = readfile("matAlarge.txt", &SizeR, &SizeC);
+        temp2 = readfile("matBlarge.txt", &SizeR_, &SizeC_);
+        StartTime = MPI_Wtime();
         if (temp1 != 0 || temp2 != 0)
         {
             elements_per_process = (SizeR * SizeC) / world_size;
@@ -122,6 +122,7 @@ int main(int argc, char **argv)
     }
     else
     {
+        StartTime = MPI_Wtime();
         MPI_Recv(&elements_per_process, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
         double *element_1 = malloc(elements_per_process * sizeof(double));
         MPI_Recv(element_1, elements_per_process, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, &status);

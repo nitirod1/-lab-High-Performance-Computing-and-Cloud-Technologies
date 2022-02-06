@@ -149,8 +149,8 @@ void master_process(int size)
     Matrixs matA, matB, result;
     double *cal = 0;
     int element_per_process;
-    Readfile("matAsmall.txt", &matA);
-    Readfile("matBsmall.txt", &matB);
+    Readfile("matAlarge.txt", &matA);
+    Readfile("matBlarge.txt", &matB);
     element_per_process = send_process(&matA, size);
     element_per_process = send_process(&matB, size);
     cal = cal_matrix(&matA, &matB, element_per_process);
