@@ -142,16 +142,16 @@ void deliver()
     MPI_Comm_size(MPI_COMM_WORLD, &SIZE);
     if (SIZE > 1)
     {
-        select_process_read("matAsmall.txt", 0, &mat1);
-        select_process_read("matBsmall.txt", 1, &mat2);
+        select_process_read("matAlarge.txt", 0, &mat1);
+        select_process_read("matBlarge.txt", 1, &mat2);
         Bcast_process(0, &mat1);
         Bcast_process(1, &mat2);
         MPI_Barrier(MPI_COMM_WORLD);
     }
     else
     {
-        select_process_read("matAsmall.txt", 0, &mat1);
-        select_process_read("matBsmall.txt", 0, &mat2);
+        select_process_read("matAlarge.txt", 0, &mat1);
+        select_process_read("matBlarge.txt", 0, &mat2);
         Bcast_process(0, &mat1);
         Bcast_process(0, &mat2);
     }
@@ -181,38 +181,20 @@ void deliver()
         
     }
     MPI_Gatherv(result.data,elem_size,MPI_DOUBLE,output_all_p.data,count,disp,MPI_DOUBLE,0,MPI_COMM_WORLD);
-    if(rank == 0){
-        writefile("test.txt",&output_all_p);
-    }
-    // row_p[SIZE - 1] = mod + (mat->sizeR / SIZE);
-
-    // element_size = mat1.sizeC * mat1.sizeR + mat1.commute;
-    // elem_p_r1 = Element_Per_Process(element_size);
-    // arrays_reservation_Matrixs(&recv1, element_size);
-    // element_size = mat2.sizeC * mat2.sizeR + mat2.commute;
-    // elem_p_r2 = Element_Per_Process(element_size);
-    // printf("after %d %d\n",recv2.sizeR,recv2.sizeC);
-    // arrays_reservation_Matrixs(&recv2, element_size);
-    // if(SIZE>1){
-    //     MPI_Scatter(mat1.data, elem_p_r1, MPI_DOUBLE, recv1.data, elem_p_r1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    //     MPI_Scatter(mat2.data, elem_p_r2, MPI_DOUBLE, recv2.data, elem_p_r2, MPI_DOUBLE, 1, MPI_COMM_WORLD);
-    // }
-    // else{
-    //     MPI_Scatter(mat1.data, elem_p_r1, MPI_DOUBLE, recv1.data, elem_p_r1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    //     MPI_Scatter(mat2.data, elem_p_r2, MPI_DOUBLE, recv2.data, elem_p_r2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    // }
-
-    // result.data =calculation(&recv1, &recv2);
-    // if(rank == 0 ){
-    //     results = malloc(sizeof(double) * element_per_process * size_process);
-    // }
-    // printf("%d %d\n",result->sizeR,result->sizeC);
+    
 }
 int main(int argc, char **argv)
 {
     double StartTime, EndTime;
-    StartTime = MPI_Wtime();
+    int rank;
     MPI_Init(&argc, &argv);
-    EndTime = MPI_Wtime();
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(rank ==0){
+        StartTime = MPI_Wtime();
+    }
     deliver();
+    if(rank ==0){
+        EndTime = MPI_Wtime();
+        printf("time :%lf\n",EndTime-StartTime);
+    }
 }
