@@ -26,9 +26,7 @@ void Readfile(char *filename, Matrixs *mat)
     }
     fscanf(fp, "%d %d", &mat->sizeR, &mat->sizeC);
     element_size = mat->sizeR * mat->sizeC;
-    mat->commute = element_size % SIZE;
-    element_size += mat->commute;
-    arrays_reservation_Matrixs(mat, element_size + mat->commute);
+    arrays_reservation_Matrixs(mat, element_size);
     for (i = 0; i < element_size; i++)
     {
         fscanf(fp, "%lf", &mat->data[i]);
@@ -62,29 +60,43 @@ void select_process_read(char *filename, int process_n, Matrixs *mat)
         Readfile(filename, mat);
     }
 }
-int Element_Per_Process(int size_element)
+int Row_Per_Process(Matrixs *mat)
 {
-    int SIZE;
+    int SIZE, mod, rank;
+    int *row_p, i, output;
     MPI_Comm_size(MPI_COMM_WORLD, &SIZE);
-    return size_element / SIZE;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    row_p = malloc(sizeof(int) * SIZE);
+    if (rank == SIZE - 1)
+    {
+
+        for (i = 0; i < SIZE; i++)
+        {
+            row_p[i] = mat->sizeR / SIZE;
+        }
+    }
+    MPI_Scatter(row_p, 1, MPI_INT, &output, 1, MPI_INT, SIZE - 1, MPI_COMM_WORLD);
+    return output;
 }
 
-void send_size_mat(int process_n, Matrixs *mat)
-{
-    MPI_Bcast(&mat->sizeC, 1, MPI_INT, process_n, MPI_COMM_WORLD);
-    MPI_Bcast(&mat->sizeR, 1, MPI_INT, process_n, MPI_COMM_WORLD);
-    MPI_Bcast(&mat->commute, 1, MPI_INT, process_n, MPI_COMM_WORLD);
-}
 void m_to_r_size(Matrixs *m1, Matrixs *m2)
 {
     m2->sizeC = m1->sizeC;
     m2->sizeR = m1->sizeR;
     m2->commute = m1->commute;
 }
-void Bcast_process(Matrixs *m1, Matrixs *m2, int process_n)
+void Bcast_process(int process_n, Matrixs *mat)
 {
-    send_size_mat(process_n, m1);
-    m_to_r_size(m1, m2);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+    
+    MPI_Bcast(&mat->sizeC, 1, MPI_INT, process_n, MPI_COMM_WORLD);
+    MPI_Bcast(&mat->sizeR, 1, MPI_INT, process_n, MPI_COMM_WORLD);
+    if (rank != process_n)
+    {
+        arrays_reservation_Matrixs(mat, mat->sizeC * mat->sizeR);
+    }
+    MPI_Bcast(mat->data, mat->sizeC * mat->sizeR, MPI_DOUBLE, process_n, MPI_COMM_WORLD);
 }
 int check_mul(Matrixs *mat1, Matrixs *mat2)
 {
@@ -95,67 +107,105 @@ int check_mul(Matrixs *mat1, Matrixs *mat2)
     return -1;
 }
 
-void calculation(Matrixs *mat1, Matrixs *mat2,Matrixs *temp)
+int calculation(Matrixs *mat1, Matrixs *mat2,Matrixs *result, int start, int end)
 {
-    int i, j, k, index_mat = 0;
-    arrays_reservation_Matrixs(temp, mat1->sizeR * mat2->sizeC);
+    int i, j, k, index_mat = 0,rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+    arrays_reservation_Matrixs(result, (end - start)*mat2->sizeC);
     if (check_mul(mat1, mat2))
     {
-        for (i = 0; i < mat1->sizeR; i++)
+        // i=0,i<mat1->sizeR
+        for (i = start; i < end; i++)
         {
             for (j = 0; j < mat2->sizeC; j++)
             {
                 for (k = 0; k < mat1->sizeC; k++)
                 {
-                    temp->data[index_mat] += (mat1->data[k + (i * mat1->sizeC)] * mat2->data[j + (k * mat2->sizeC)]);
+                    result->data[index_mat] += (mat1->data[k + (i * mat1->sizeC)] * mat2->data[j + (k * mat2->sizeC)]);
                 }
+                
                 index_mat++;
             }
         }
     }
-    temp->sizeR = mat1->sizeR;
-    temp->sizeC = mat2->sizeC;
-    printf("sucess\n");
+    result->sizeC = mat1->sizeR;
+    result->sizeR = mat2->sizeC;
+    return index_mat;
 }
 
 void deliver()
 {
-    Matrixs mat1, mat2, recv1, recv2,result;
-    int rank, elem_p_r1, elem_p_r2, element_size, SIZE;
+    Matrixs mat1, mat2, output_all_p, result;
+    double *results = NULL;
+    int rank, start, end, row_size, SIZE, elem_size,mod,*count = NULL,*disp=NULL,i;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &SIZE);
     if (SIZE > 1)
     {
         select_process_read("matAsmall.txt", 0, &mat1);
         select_process_read("matBsmall.txt", 1, &mat2);
-        Bcast_process(&mat1, &recv1, 0);
-        Bcast_process(&mat2, &recv2, 1);
+        Bcast_process(0, &mat1);
+        Bcast_process(1, &mat2);
         MPI_Barrier(MPI_COMM_WORLD);
     }
-    else{
+    else
+    {
         select_process_read("matAsmall.txt", 0, &mat1);
         select_process_read("matBsmall.txt", 0, &mat2);
-        Bcast_process(&mat1, &recv1, 0);
-        Bcast_process(&mat2, &recv2, 0);
+        Bcast_process(0, &mat1);
+        Bcast_process(0, &mat2);
     }
-    element_size = mat1.sizeC * mat1.sizeR + mat1.commute;
-    printf("before :%d\n",element_size);
-    elem_p_r1 = Element_Per_Process(element_size);
-    arrays_reservation_Matrixs(&recv1, element_size);
-    element_size = mat2.sizeC * mat2.sizeR + mat2.commute;
-    elem_p_r2 = Element_Per_Process(element_size);
-    printf("after %d %d\n",recv2.sizeR,recv2.sizeC);
-    arrays_reservation_Matrixs(&recv2, element_size);
-    if(SIZE>1){
-        MPI_Scatter(mat1.data, elem_p_r1, MPI_DOUBLE, recv1.data, elem_p_r1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Scatter(mat2.data, elem_p_r2, MPI_DOUBLE, recv2.data, elem_p_r2, MPI_DOUBLE, 1, MPI_COMM_WORLD);
+    row_size = Row_Per_Process(&mat1);
+    start = rank * row_size ;
+    if (rank == SIZE - 1)
+    {
+        mod = mat1.sizeR % SIZE;
+        row_size = mod + row_size;
     }
-    else{
-        MPI_Scatter(mat1.data, elem_p_r1, MPI_DOUBLE, recv1.data, elem_p_r1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Scatter(mat2.data, elem_p_r2, MPI_DOUBLE, recv2.data, elem_p_r2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    end = start + row_size ;
+    elem_size=calculation(&mat1,&mat2,&result,start,end);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(rank==0){
+        disp = malloc(sizeof(int)*SIZE);
+        count = malloc(sizeof(int)*SIZE);
     }
-    calculation(&recv1, &recv2,&result);
-    
+    MPI_Gather(&elem_size,1,MPI_INT,count,1,MPI_INT,0,MPI_COMM_WORLD);
+    if(rank == 0){
+        disp[0]=0;
+        for(i=1;i<SIZE;i++){
+            disp[i]=disp[i-1]+count[i-1];
+        }
+        output_all_p.sizeR = mat1.sizeR;
+        output_all_p.sizeC = mat2.sizeC;
+        arrays_reservation_Matrixs(&output_all_p,output_all_p.sizeR *output_all_p.sizeC );
+        
+    }
+    MPI_Gatherv(result.data,elem_size,MPI_DOUBLE,output_all_p.data,count,disp,MPI_DOUBLE,0,MPI_COMM_WORLD);
+    if(rank == 0){
+        writefile("test.txt",&output_all_p);
+    }
+    // row_p[SIZE - 1] = mod + (mat->sizeR / SIZE);
+
+    // element_size = mat1.sizeC * mat1.sizeR + mat1.commute;
+    // elem_p_r1 = Element_Per_Process(element_size);
+    // arrays_reservation_Matrixs(&recv1, element_size);
+    // element_size = mat2.sizeC * mat2.sizeR + mat2.commute;
+    // elem_p_r2 = Element_Per_Process(element_size);
+    // printf("after %d %d\n",recv2.sizeR,recv2.sizeC);
+    // arrays_reservation_Matrixs(&recv2, element_size);
+    // if(SIZE>1){
+    //     MPI_Scatter(mat1.data, elem_p_r1, MPI_DOUBLE, recv1.data, elem_p_r1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //     MPI_Scatter(mat2.data, elem_p_r2, MPI_DOUBLE, recv2.data, elem_p_r2, MPI_DOUBLE, 1, MPI_COMM_WORLD);
+    // }
+    // else{
+    //     MPI_Scatter(mat1.data, elem_p_r1, MPI_DOUBLE, recv1.data, elem_p_r1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //     MPI_Scatter(mat2.data, elem_p_r2, MPI_DOUBLE, recv2.data, elem_p_r2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // }
+
+    // result.data =calculation(&recv1, &recv2);
+    // if(rank == 0 ){
+    //     results = malloc(sizeof(double) * element_per_process * size_process);
+    // }
     // printf("%d %d\n",result->sizeR,result->sizeC);
 }
 int main(int argc, char **argv)
