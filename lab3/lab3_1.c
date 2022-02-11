@@ -99,7 +99,7 @@ double *splitdata()
         result.sizeR = mat1.sizeR;
         arrays_reservation_Matrixs(&result,mat1.sizeC*mat1.sizeR);
         result.data = results;
-        writefile("result_Large.txt", &result);
+        
     }
 }
 int main(int argc, char **argv)
@@ -115,7 +115,7 @@ int main(int argc, char **argv)
     EndTime = MPI_Wtime();
     if (rank == 0)
     {
-        printf("process %d : %lf sec\n", rank, EndTime - StartTime);
+        printf("time :%lf \n",EndTime - StartTime);
     }
     MPI_Finalize();
 }

@@ -144,6 +144,7 @@ void deliver()
     {
         select_process_read("matAlarge.txt", 0, &mat1);
         select_process_read("matBlarge.txt", 1, &mat2);
+        printf("read sucess %d\n",rank);
         Bcast_process(0, &mat1);
         Bcast_process(1, &mat2);
         MPI_Barrier(MPI_COMM_WORLD);
@@ -177,11 +178,15 @@ void deliver()
         }
         output_all_p.sizeR = mat1.sizeR;
         output_all_p.sizeC = mat2.sizeC;
+        printf("recv\n");
         arrays_reservation_Matrixs(&output_all_p,output_all_p.sizeR *output_all_p.sizeC );
-        
+        printf("%d %d\n",output_all_p.sizeC,output_all_p.sizeR);
     }
     MPI_Gatherv(result.data,elem_size,MPI_DOUBLE,output_all_p.data,count,disp,MPI_DOUBLE,0,MPI_COMM_WORLD);
-    
+    if(rank==0){
+        printf("writing ...\n");
+        writefile("result.txt",&output_all_p);
+    }
 }
 int main(int argc, char **argv)
 {
