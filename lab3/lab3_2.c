@@ -42,6 +42,7 @@ void writefile(char *filename, Matrixs *mat)
         printf("file can't open %s\n", filename);
     }
     fprintf(fp, "%d %d", mat->sizeR, mat->sizeC);
+    printf("%d %d\n",mat->sizeR,mat->sizeC);
     for (i = 0; i < mat->sizeR * mat->sizeC; i++)
     {
         if (i % mat->sizeC == 0)
@@ -50,6 +51,7 @@ void writefile(char *filename, Matrixs *mat)
         }
         fprintf(fp, "%lf ", mat->data[i]);
     }
+    fclose(fp);
 }
 void select_process_read(char *filename, int process_n, Matrixs *mat)
 {
@@ -180,7 +182,7 @@ void deliver()
         output_all_p.sizeC = mat2.sizeC;
         printf("recv\n");
         arrays_reservation_Matrixs(&output_all_p,output_all_p.sizeR *output_all_p.sizeC );
-        printf("%d %d\n",output_all_p.sizeC,output_all_p.sizeR);
+        printf("%d %d\n",output_all_p.sizeR,output_all_p.sizeC);
     }
     MPI_Gatherv(result.data,elem_size,MPI_DOUBLE,output_all_p.data,count,disp,MPI_DOUBLE,0,MPI_COMM_WORLD);
     if(rank==0){
@@ -202,4 +204,5 @@ int main(int argc, char **argv)
         EndTime = MPI_Wtime();
         printf("time :%lf\n",EndTime-StartTime);
     }
+    MPI_Finalize();
 }
