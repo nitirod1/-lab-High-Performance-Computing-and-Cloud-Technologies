@@ -82,26 +82,45 @@ void allocation_mem(int **num,int size){
 void intial_send_process(){//ส่งจำนวน data ในแต่ละ process
     int  i,element_process;
     int *num;
-    element_process = n / SIZE;
+    #pragma omp parallel for private(element_process)
     for(i =0 ;i<SIZE;i++){
         if(i == SIZE-1){
             // ถ้าเป็นตัวสุดท้ายต้องส่งทั้งหมดใน arrays global
             element_process = (n /SIZE) + (n%SIZE);
         }
+        else{
+            element_process = n / SIZE;
+        }
         MPI_Send(&element_process,1,MPI_INT,i,0,MPI_COMM_WORLD);
     }
 }
-void intial_recv_process(){ // รับจำนวน data ในแต่ละ process
+int intial_recv_process(){ // รับจำนวน data ในแต่ละ process
     int element_process;
     MPI_Recv(&element_process,1,MPI_INT,0,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     printf(" %d %d \n",element_process,RANK);
+    return element_process;
+}
+void position(int *pos,int element_process){// return position start กับ end ของ data
+    
+    if(RANK == SIZE-1){
+        pos[0] = ((element_process-(n%SIZE))*RANK);
+        printf("pos[0] :%d\n",((element_process-(n%SIZE))*RANK));
+        pos[1] = (element_process-(n%SIZE))*(RANK+1) + (n%SIZE);
+    }else{
+        pos[0] = element_process*RANK;
+        pos[1] = element_process*(RANK+1);
+    }
 }
 void deliver(){
+    int element_process ;
+    int *pos;
+    allocation_mem(&(pos),2);
     if(RANK==0){
         intial_send_process();
     }
-    intial_recv_process();
-    
+    element_process= intial_recv_process();
+    position(pos,element_process);
+    printf("start %d end %d\n",pos[0],pos[1]);
     // quickSort(data, 0, n - 1);
     // printf("Sorted array in ascending order: \n");
     // printArray(data, n);
@@ -110,7 +129,6 @@ void deliver(){
 int main(int argc, char *argv[])
 {
     MPI_Init(&argc, &argv);
-    
     n = intial_size();
     MPI_Comm_size(MPI_COMM_WORLD,&SIZE);
     MPI_Comm_rank(MPI_COMM_WORLD,&RANK);
