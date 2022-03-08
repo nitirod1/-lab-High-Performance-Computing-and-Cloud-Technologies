@@ -2,80 +2,122 @@
 #include <omp.h>
 #include <mpi.h>
 #include <stdio.h>
-
+#include <stdlib.h>
+int data[] = {75, 91, 15, 64, 21, 8, 88, 54, 50, 12, 47, 72, 65, 54, 66, 22, 83, 66, 67, 0, 70, 98};
 // function to swap elements
-void swap(int *a, int *b) {
-  int t = *a;
-  *a = *b;
-  *b = t;
+int n;
+int SIZE;
+int RANK;
+void swap(int *a, int *b)
+{
+    int t = *a;
+    *a = *b;
+    *b = t;
 }
+int partition(int array[], int low, int high)
+{
 
-// function to find the partition position
-int partition(int array[], int low, int high) {
-  
-  // select the rightmost element as pivot
-  int pivot = array[high];
-  
-  // pointer for greater element
-  int i = (low - 1);
+    // select the rightmost element as pivot
+    int pivot = array[high];
 
-  // traverse each element of the array
-  // compare them with the pivot
-  for (int j = low; j < high; j++) {
-    if (array[j] <= pivot) {
-        
-      // if element smaller than pivot is found
-      // swap it with the greater element pointed by i
-      i++;
-      
-      // swap element at i with element at j
-      swap(&array[i], &array[j]);
+    // pointer for greater element
+    int i = (low - 1);
+
+    // traverse each element of the array
+    // compare them with the pivot
+    for (int j = low; j < high; j++)
+    {
+        if (array[j] <= pivot)
+        {
+
+            // if element smaller than pivot is found
+            // swap it with the greater element pointed by i
+            i++;
+
+            // swap element at i with element at j
+            swap(&array[i], &array[j]);
+        }
     }
-  }
 
-  // swap the pivot element with the greater element at i
-  swap(&array[i + 1], &array[high]);
-  
-  // return the partition point
-  return (i + 1);
+    // swap the pivot element with the greater element at i
+    swap(&array[i + 1], &array[high]);
+
+    // return the partition point
+    return (i + 1);
 }
 
-void quickSort(int array[], int low, int high) {
-  if (low < high) {
-    
-    // find the pivot element such that
-    // elements smaller than pivot are on left of pivot
-    // elements greater than pivot are on right of pivot
-    int pi = partition(array, low, high);
-    
-    // recursive call on the left of pivot
-    quickSort(array, low, pi - 1);
-    
-    // recursive call on the right of pivot
-    quickSort(array, pi + 1, high);
-  }
+
+void quickSort(int array[], int low, int high)
+{
+    if (low < high)
+    {
+        // find the pivot element such that
+        // elements smaller than pivot are on left of pivot
+        // elements greater than pivot are on right of pivot
+        int pi = partition(array, low, high);
+
+        // recursive call on the left of pivot
+        quickSort(array, low, pi - 1);
+
+        // recursive call on the right of pivot
+        quickSort(array, pi + 1, high);
+    }
 }
 
 // function to print array elements
-void printArray(int array[], int size) {
-  for (int i = 0; i < size; ++i) {
-    printf("%d  ", array[i]);
-  }
-  printf("\n");
+void printArray(int array[], int size)
+{
+    for (int i = 0; i < size; ++i)
+    {
+        printf("%d  ", array[i]);
+    }
+    printf("\n");
+}
+int intial_size(){ // ประกาศ size ของ data
+    return sizeof(data) / sizeof(data[0]);
+}
+void allocation_mem(int **num,int size){
+    *num = (int*)malloc(size*sizeof(int));
+}
+void intial_send_process(){//ส่งจำนวน data ในแต่ละ process
+    int  i,element_process;
+    int *num;
+    element_process = n / SIZE;
+    for(i =0 ;i<SIZE;i++){
+        if(i == SIZE-1){
+            // ถ้าเป็นตัวสุดท้ายต้องส่งทั้งหมดใน arrays global
+            element_process = (n /SIZE) + (n%SIZE);
+        }
+        MPI_Send(&element_process,1,MPI_INT,i,0,MPI_COMM_WORLD);
+    }
+}
+void intial_recv_process(){ // รับจำนวน data ในแต่ละ process
+    int element_process;
+    MPI_Recv(&element_process,1,MPI_INT,0,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    printf(" %d %d \n",element_process,RANK);
+}
+void deliver(){
+    if(RANK==0){
+        intial_send_process();
+    }
+    intial_recv_process();
+    
+    // quickSort(data, 0, n - 1);
+    // printf("Sorted array in ascending order: \n");
+    // printArray(data, n);
 }
 
-// main function
-int main() {
-  int data[] = {8, 7, 2, 1, 0, 9, 6};
-  
-  int n = sizeof(data) / sizeof(data[0]);
-  
-  printf("Unsorted Array\n");
-  printArray(data, n);
-  
-  // perform quicksort on data
-  quickSort(data, 0, n - 1);
-  
-  printf("Sorted array in ascending order: \n");
-  printArray(data, n);
+int main(int argc, char *argv[])
+{
+    MPI_Init(&argc, &argv);
+    
+    n = intial_size();
+    MPI_Comm_size(MPI_COMM_WORLD,&SIZE);
+    MPI_Comm_rank(MPI_COMM_WORLD,&RANK);
+    if(RANK == 0){
+        printf("Unsorted arrays\n");
+        // printArray(data, n);
+    }
+    deliver();
+    MPI_Finalize();
 }
