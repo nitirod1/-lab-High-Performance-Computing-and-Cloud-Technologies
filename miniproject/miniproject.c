@@ -79,9 +79,8 @@ int intial_size(){ // ประกาศ size ของ data
 void allocation_mem(int **num,int size){
     *num = (int*)malloc(size*sizeof(int));
 }
-void intial_send_process(){//ส่งจำนวน data ในแต่ละ process
+void intial_send_process(int count[]){//ส่งจำนวน data ในแต่ละ process
     int  i,element_process;
-    int *num;
     #pragma omp parallel for private(element_process)
     for(i =0 ;i<SIZE;i++){
         if(i == SIZE-1){
@@ -91,39 +90,73 @@ void intial_send_process(){//ส่งจำนวน data ในแต่ละ
         else{
             element_process = n / SIZE;
         }
+        count[i]=element_process;
         MPI_Send(&element_process,1,MPI_INT,i,0,MPI_COMM_WORLD);
     }
 }
 int intial_recv_process(){ // รับจำนวน data ในแต่ละ process
     int element_process;
     MPI_Recv(&element_process,1,MPI_INT,0,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-    printf(" %d %d \n",element_process,RANK);
     return element_process;
 }
 void position(int *pos,int element_process){// return position start กับ end ของ data
-    
     if(RANK == SIZE-1){
         pos[0] = ((element_process-(n%SIZE))*RANK);
-        printf("pos[0] :%d\n",((element_process-(n%SIZE))*RANK));
         pos[1] = (element_process-(n%SIZE))*(RANK+1) + (n%SIZE);
     }else{
         pos[0] = element_process*RANK;
         pos[1] = element_process*(RANK+1);
     }
 }
-void deliver(){
-    int element_process ;
-    int *pos;
-    allocation_mem(&(pos),2);
-    if(RANK==0){
-        intial_send_process();
+void disp(int displace[],int count[]){//return displace arrays
+    int i;
+    displace[0] = 0;
+    for(i=1;i<SIZE;i++){
+        displace[i] =displace[i-1]+count[i-1];
+        printf("disp %d\n",displace[i]); 
     }
+}
+void root_process(){
+    int element_process ;
+    int *pos,*displace,*count;
+    allocation_mem(&(pos),2);
+    allocation_mem(&(displace),SIZE);
+    allocation_mem(&(count),SIZE);
+    intial_send_process(count);
+    disp(displace,count);
     element_process= intial_recv_process();
     position(pos,element_process);
-    printf("start %d end %d\n",pos[0],pos[1]);
-    // quickSort(data, 0, n - 1);
+    printf("data:%d rank %d start %d end %d\n",data[pos[1]],RANK,pos[0],pos[1]-1);
+    quickSort(data, pos[0], pos[1]-1);
+    printf("Sorted array in ascending order: \n");
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Gatherv(data,element_process,MPI_INT,data,count,displace,MPI_INT,0,MPI_COMM_WORLD);
+}
+void slave_process(){
+    int element_process ,temp[10];
+    int *pos,*displace,*count;
+    int i,j=0;
+    allocation_mem(&(pos),2);
+    element_process= intial_recv_process();
+    position(pos,element_process);
+    printf("rank %d start %d end %d\n",RANK,pos[0],pos[1]);
+    quickSort(data, pos[0], pos[1]-1);
+    for(i=pos[0];i<pos[1];i++){
+        temp[j++] = data[i];
+    }
     // printf("Sorted array in ascending order: \n");
-    // printArray(data, n);
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Gatherv(temp, element_process, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, MPI_COMM_WORLD);
+}
+void deliver(){
+    if(RANK == 0){
+        root_process();
+    }else{
+        slave_process();
+    }
+    if (RANK==0){
+    printArray(data, n);
+    }
 }
 
 int main(int argc, char *argv[])
@@ -133,8 +166,8 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD,&SIZE);
     MPI_Comm_rank(MPI_COMM_WORLD,&RANK);
     if(RANK == 0){
-        printf("Unsorted arrays\n");
-        // printArray(data, n);
+        printf("UNSORTED\n");
+        printArray(data, n);
     }
     deliver();
     MPI_Finalize();
