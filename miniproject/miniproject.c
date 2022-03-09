@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 int data[] = {7, 13, 18, 2, 17, 1, 14, 20, 6, 10, 15, 9, 3, 16, 19, 4, 11, 12, 5, 8};
+int process_min[4] ;
+int process_max[4];
 // function to swap elements
 int n;
 int SIZE;
@@ -101,10 +103,10 @@ void intial_send_process()
         MPI_Send(&element_process, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
     }
 }
-int intial_recv_process()
+int intial_recv_process(int root_p)
 { // รับจำนวน data ในแต่ละ process
     int element_process;
-    MPI_Recv(&element_process, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(&element_process, 1, MPI_INT, root_p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     return element_process;
 }
 void position(int *pos, int element_process)
@@ -134,12 +136,12 @@ int select_pivot(int last_element)
 {
     return data[last_element];
 }
-int gather_data(int size,int arrays[],int dis){
+int gather_data(int root_p,int size,int arrays[],int dis){
     int *count,*count_pos_quick,*displace,i,all=0;
     allocation_mem(&(displace), SIZE);
     allocation_mem(&(count_pos_quick), SIZE);
     allocation_mem(&(count), SIZE);
-    MPI_Gather(&size, 1, MPI_INT, count_pos_quick, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Gather(&size, 1, MPI_INT, count_pos_quick, 1, MPI_INT, root_p, MPI_COMM_WORLD);
     for (i = 0; i < SIZE; i++)
     {
         count[i] = count_pos_quick[i];
@@ -147,16 +149,16 @@ int gather_data(int size,int arrays[],int dis){
         
     }
     disp(displace, count,dis);
-    MPI_Gatherv(arrays, count[0], MPI_INT, data, count, displace, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Gatherv(arrays, count[0], MPI_INT, data, count, displace, MPI_INT, root_p, MPI_COMM_WORLD);
     return all;
 }
-void gather_data_slave(int size,int arrays[]){
+void gather_data_slave(int root_p,int size,int arrays[]){
     int *count,*count_pos_quick,*displace,i;
     allocation_mem(&(displace), SIZE);
     allocation_mem(&(count_pos_quick), SIZE);
     allocation_mem(&(count), SIZE);
-    MPI_Gather(&size, 1, MPI_INT, NULL, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Gatherv(arrays, size, MPI_INT,NULL, NULL, NULL, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Gather(&size, 1, MPI_INT, NULL, 1, MPI_INT, root_p, MPI_COMM_WORLD);
+    MPI_Gatherv(arrays, size, MPI_INT,NULL, NULL, NULL, MPI_INT,root_p, MPI_COMM_WORLD);
 }   
 void prepare_data_less(int temp[],int start,int end){
     int i , j=0;
@@ -172,56 +174,55 @@ void prepare_data_more(int temp[],int end,int start){
         temp[j++] = data[i];
     }
 }
-void root_process()
+void root_process(int root_p)
 {
     int element_process, pivot, s;
-    int *pos,   i = 0,temp[10],num,j=0;
+    int *pos,   i = 0,temp[10],element_min,element_max,j=0;
     pivot = select_pivot(n - 1);
-    MPI_Bcast(&pivot, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&pivot, 1, MPI_INT, root_p, MPI_COMM_WORLD);
     // printf("RANK %d pivot %d\n", RANK, pivot);
     allocation_mem(&(pos), 2);
     intial_send_process();
-    element_process = intial_recv_process();
+    element_process = intial_recv_process(root_p);
     position(pos, element_process);
     s = partition(data, pivot, pos[0], pos[1]);
     // printf("Sorted array in ascending order: \n");
     prepare_data_more(temp,s,pos[1]);
-    num = gather_data(s,data,0);
+    element_min = gather_data(root_p,s,data,0);
     s = pos[1]-s+1;
-    gather_data(s,temp,num);
+    element_max = gather_data(root_p,s,temp,element_min);
+    printf("min %d max %d\n",element_min,element_max);
 }
-void slave_process()
+void slave_process(int root_p)
 {
     int element_process, pivot, temp[10], s;
     int *pos, *displace, *count, i, j = 0, *count_pos_quick;
-    MPI_Bcast(&pivot, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&pivot, 1, MPI_INT, root_p, MPI_COMM_WORLD);
     allocation_mem(&(pos), 2);
-    element_process = intial_recv_process();
+    element_process = intial_recv_process(root_p);
     position(pos, element_process);
     s = partition(data, pivot, pos[0], pos[1]);
     s = s - pos[0];
     prepare_data_less(temp,pos[0],pos[1]);
-    gather_data_slave(s,temp);
+    gather_data_slave(root_p,s,temp);
     s = s+pos[0];
     prepare_data_more(temp,s,pos[1]);
     s = pos[1]-s+1;
-    gather_data_slave(s,temp);
+    gather_data_slave(root_p,s,temp);
     
 }
 void deliver()
 {
+    int root_p =0,slave_p[] = {1,2,3,4};
     if (RANK == 0)
     {
-        root_process();
+        root_process(root_p);
     }
     else
     {
-        slave_process();
+        slave_process(root_p);
     }
-    if (RANK == 0)
-    {
-        printArray(data, n);
-    }
+    
     
 }
 
@@ -234,9 +235,14 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &RANK);
     if (RANK == 0)
     {
-        // printf("UNSORTED\n");
-        // printArray(data, n);
+        printf("UNSORTED\n");
+        printArray(data, n);
     }
     deliver();
+    if (RANK == 0)
+    {
+        printf("SORTED\n");
+        printArray(data, n);
+    }
     MPI_Finalize();
 }
