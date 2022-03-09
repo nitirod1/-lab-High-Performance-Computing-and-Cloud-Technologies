@@ -173,7 +173,7 @@ void prepare_data_more(int temp[],int end,int start){
         temp[j++] = data[i];
     }
 }
-void root_process(int root_p,int slave_p[])
+void root_process(int root_p,int slave_p[],int mn[])
 {
     int element_process, pivot, s;
     int *pos,   i = 0,temp[10],element_min,element_max,j=0;
@@ -190,7 +190,8 @@ void root_process(int root_p,int slave_p[])
     element_min = gather_data(root_p,s,data,0);
     s = pos[1]-s+1;
     element_max = gather_data(root_p,s,temp,element_min);
-    printf("min %d max %d\n",element_min,element_max);
+    mn[0]=element_min;
+    mn[1]=element_max;
 }
 void slave_process(int root_p)
 {
@@ -210,6 +211,7 @@ void slave_process(int root_p)
     gather_data_slave(root_p,s,temp);
     
 }
+
 void fill_array(int arrays[]){
     int i = 0;
     for(i=0;i<SIZE;i++){
@@ -217,24 +219,65 @@ void fill_array(int arrays[]){
     }
     arrays[SIZE] = -1;
 }
-void quick_sort(){
-
+int count_size_p(int arrays[]){
+    int i=0;
+    while(arrays[i]!=-1)i++;
+    return i;
 }
-void deliver()
-{
-    int root_p =0,*slave_p;
-    allocation_mem(&slave_p,SIZE+1);
-    fill_array(slave_p);
-    if (RANK == 0)
+void add_limit_p(int arrays[],int limit){
+    arrays[limit] = -1;
+}
+void mn_max_process(int slave_p[],int p1[],int p2[]){
+    int i,j=0,size_p1,size_p2,size_slave_p;
+    size_slave_p =count_size_p(slave_p);
+    size_p1 = (size_slave_p /2);
+    size_p2 = (size_slave_p/2)+size_slave_p%2;
+    p1[size_p1] = -1;
+    p2[size_p2]=-1;
+    for(i=0;i<size_p1;i++){
+        p1[i] = slave_p[j++];
+    }
+    
+    for(i=0;i<size_p2;i++){
+        p2[i]=slave_p[j++];
+    }
+}
+void Quick_sort(int root_p,int slave_p[]){
+    int mn[2],i;
+    if (RANK == root_p)
     {
-        root_process(root_p,slave_p);
+        root_process(root_p,slave_p,mn);
+        printf("size :%d\n",count_size_p(slave_p));
+        if(mn[0]<mn[1]){
+            mn_max_process(slave_p,process_min,process_max);
+        }else{
+            mn_max_process(slave_p,process_max,process_min);
+        }
+        for(i=0;process_max[i]!=-1;i++){
+            printf("process max %d\n",process_max[i]);
+        }
+        for(i=0;process_min[i]!=-1;i++){
+            printf("process min %d\n",process_min[i]);
+        }
     }
     else
     {
         slave_process(root_p);
     }
-    
-    
+}
+void show_p(int arrays[]){
+    int i=0;
+    while(arrays[i]!=-1){
+        printf("arrays :%d\n",arrays[i]);
+        i++;
+    }
+}
+void deliver()
+{
+    int root_p =0,*slave_p,mn[2];
+    allocation_mem(&slave_p,SIZE+1);
+    fill_array(slave_p);
+    Quick_sort(root_p,slave_p);
 }
 
 int main(int argc, char *argv[])
