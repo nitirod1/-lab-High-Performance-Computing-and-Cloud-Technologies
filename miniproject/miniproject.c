@@ -85,13 +85,12 @@ void allocation_mem(int **num, int size)
 {
     *num = (int *)malloc(size * sizeof(int));
 }
-void intial_send_process()
+void intial_send_process(int slave_p[])
 { //ส่งจำนวน data ในแต่ละ process
     int i, element_process;
-#pragma omp parallel for private(element_process)
-    for (i = 0; i < SIZE; i++)
+    for (i = 0; slave_p[i]!=-1; i++)
     {
-        if (i == SIZE - 1)
+        if (slave_p[i+1] == -1)
         {
             // ถ้าเป็นตัวสุดท้ายต้องส่งทั้งหมดใน arrays global
             element_process = (n / SIZE) + (n % SIZE);
@@ -100,7 +99,7 @@ void intial_send_process()
         {
             element_process = n / SIZE;
         }
-        MPI_Send(&element_process, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+        MPI_Send(&element_process, 1, MPI_INT, slave_p[i], 0, MPI_COMM_WORLD);
     }
 }
 int intial_recv_process(int root_p)
@@ -174,7 +173,7 @@ void prepare_data_more(int temp[],int end,int start){
         temp[j++] = data[i];
     }
 }
-void root_process(int root_p)
+void root_process(int root_p,int slave_p[])
 {
     int element_process, pivot, s;
     int *pos,   i = 0,temp[10],element_min,element_max,j=0;
@@ -182,7 +181,7 @@ void root_process(int root_p)
     MPI_Bcast(&pivot, 1, MPI_INT, root_p, MPI_COMM_WORLD);
     // printf("RANK %d pivot %d\n", RANK, pivot);
     allocation_mem(&(pos), 2);
-    intial_send_process();
+    intial_send_process(slave_p);
     element_process = intial_recv_process(root_p);
     position(pos, element_process);
     s = partition(data, pivot, pos[0], pos[1]);
@@ -211,12 +210,24 @@ void slave_process(int root_p)
     gather_data_slave(root_p,s,temp);
     
 }
+void fill_array(int arrays[]){
+    int i = 0;
+    for(i=0;i<SIZE;i++){
+        arrays[i] = i;
+    }
+    arrays[SIZE] = -1;
+}
+void quick_sort(){
+
+}
 void deliver()
 {
-    int root_p =0,slave_p[] = {1,2,3,4};
+    int root_p =0,*slave_p;
+    allocation_mem(&slave_p,SIZE+1);
+    fill_array(slave_p);
     if (RANK == 0)
     {
-        root_process(root_p);
+        root_process(root_p,slave_p);
     }
     else
     {
