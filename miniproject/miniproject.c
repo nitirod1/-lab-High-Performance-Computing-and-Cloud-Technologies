@@ -51,22 +51,6 @@ int partition(int array[], int pivot, int low, int high)
     return -1;
 }
 
-// void quickSort(int array[], int low, int high)
-// {
-//     if (low < high)
-//     {
-//         // find the pivot element such that
-//         // elements smaller than pivot are on left of pivot
-//         // elements greater than pivot are on right of pivot
-//         int pi = partition(array, low, high);
-
-//         // // recursive call on the left of pivot
-//         // quickSort(array, low, pi - 1);
-
-//         // // recursive call on the right of pivot
-//         // quickSort(array, pi + 1, high);
-//     }
-// }
 
 // function to print array elements
 void printArray(int array[], int size)
@@ -145,7 +129,6 @@ int gather_data(int root_p,int size,int arrays[],int dis){
     {
         count[i] = count_pos_quick[i];
         all = all+count[i];
-        
     }
     disp(displace, count,dis);
     MPI_Gatherv(arrays, count[0], MPI_INT, data, count, displace, MPI_INT, root_p, MPI_COMM_WORLD);
@@ -184,15 +167,16 @@ void root_process(int root_p,int slave_p[],int mn[])
     intial_send_process(slave_p);
     element_process = intial_recv_process(root_p);
     position(pos, element_process);
-    s = partition(data, pivot, pos[0], pos[1]);
-    // printf("Sorted array in ascending order: \n");
-    prepare_data_more(temp,s,pos[1]);
+    s = partition(data, pivot, pos[0], pos[1]);// return section partition
+    // รวม ทุก process
+    prepare_data_more(temp,s,pos[1]); // return temp ออกมาเป็นไซต์มากกว่า
     element_min = gather_data(root_p,s,data,0);
-    s = pos[1]-s+1;
+    s = pos[1]-s+1; // size
     element_max = gather_data(root_p,s,temp,element_min);
     mn[0]=element_min;
     mn[1]=element_max;
 }
+
 void slave_process(int root_p)
 {
     int element_process, pivot, temp[10], s;
@@ -242,16 +226,32 @@ void mn_max_process(int slave_p[],int p1[],int p2[]){
         p2[i]=slave_p[j++];
     }
 }
+// void quickSort(int array[], int low, int high)
+// {
+//     if (low < high)
+//     {
+//         // find the pivot element such that
+//         // elements smaller than pivot are on left of pivot
+//         // elements greater than pivot are on right of pivot
+//         int pi = partition(array, low, high);
+
+//         // // recursive call on the left of pivot
+//         // quickSort(array, low, pi - 1);
+
+//         // // recursive call on the right of pivot
+//         // quickSort(array, pi + 1, high);
+//     }
+// }
+
 void Quick_sort(int root_p,int slave_p[]){
     int mn[2],i;
     if (RANK == root_p)
     {
         root_process(root_p,slave_p,mn);
-        printf("size :%d\n",count_size_p(slave_p));
         if(mn[0]<mn[1]){
             mn_max_process(slave_p,process_min,process_max);
         }else{
-            mn_max_process(slave_p,process_max,process_min);
+            mn_max_process(slave_p,process_max,process_min);// แบ่งขนาด min process max process เท่าไหร่
         }
         for(i=0;process_max[i]!=-1;i++){
             printf("process max %d\n",process_max[i]);
@@ -278,6 +278,7 @@ void deliver()
     allocation_mem(&slave_p,SIZE+1);
     fill_array(slave_p);
     Quick_sort(root_p,slave_p);
+    printf("as\n");
 }
 
 int main(int argc, char *argv[])
